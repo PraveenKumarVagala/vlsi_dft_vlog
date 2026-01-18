@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Essentials for DFT Engineers | DFT Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">🔧 DFT Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="02_Digital_Design_Fundamentals.html">Next →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 1 of 11</span>
+            <h1>Linux Essentials for DFT Engineers</h1>
+            <p class="subtitle">Master the command line to boost your productivity</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+        </div>
+
+        <h2>Why Linux?</h2>
+        <p>Most EDA tools (Synopsys, Cadence, Mentor) run on Linux. You'll spend 80% of your time in the terminal. Master these commands and you'll work 10x faster.</p>
+
+        <h2>Terminal Navigation</h2>
+        
+<pre><code># Know where you are
+pwd                      # /home/user/project
+
+# Move around
+cd /proj/dft/run         # Go to absolute path
+cd ../scripts            # Go up one level, then to scripts
+cd -                     # Go back to previous directory
+cd ~                     # Go home
+
+# List files
+ls                       # Basic list
+ls -la                   # All files with details
+ls -lrt                  # Sort by time (newest last) - VERY USEFUL
+ls *.v                   # All Verilog files</code></pre>
+
+        <div class="tip">
+            <code>ls -lrt</code> is your best friend - shows newest files at bottom, perfect for checking latest runs.
+        </div>
+
+        <h2>File Operations You'll Use Daily</h2>
+
+        <h3>Viewing Files</h3>
+<pre><code>cat file.rpt                    # Print whole file
+head -50 file.rpt               # First 50 lines
+tail -50 file.rpt               # Last 50 lines
+tail -f logfile.log             # Watch file live (for running jobs)
+less file.rpt                   # Scrollable view (q to quit)</code></pre>
+
+        <h3>Searching in Files</h3>
+<pre><code>grep "Error" *.log              # Find "Error" in all log files
+grep -i "warning" file.rpt      # Case-insensitive search
+grep -r "module_name" .         # Recursive search in current dir
+grep -n "fault" file.rpt        # Show line numbers
+grep -c "DT" coverage.rpt       # Count matches</code></pre>
+
+        <h3>Power Combos with Pipes</h3>
+<pre><code>grep "Error" run.log | wc -l           # Count errors
+cat faults.rpt | grep "UD" | head -20  # First 20 undetected faults
+grep -r "clk" . | grep -v ".svn"       # Search but exclude .svn</code></pre>
+
+        <h2>File Management</h2>
+<pre><code># Copy/Move
+cp file1.v file1_backup.v       # Copy
+cp -r dir1 dir1_backup          # Copy directory
+mv old_name.v new_name.v        # Rename
+mv file.v ../other_dir/         # Move to another directory
+
+# Create/Delete
+mkdir -p run/atpg/logs          # Create nested directories
+rm file.v                       # Delete file
+rm -rf old_run/                 # Delete directory (CAREFUL!)
+
+# Permissions
+chmod +x script.sh              # Make executable
+chmod 755 script.sh             # rwx for owner, rx for others</code></pre>
+
+        <h2>Job Control</h2>
+<pre><code># Run in background
+command &                        # Run in background
+nohup command > log.txt &        # Run even after logout
+
+# Check jobs
+ps -ef | grep atpg              # Find running ATPG jobs
+jobs                            # List background jobs
+top                             # Live process monitor
+
+# Kill jobs
+kill PID                        # Kill by process ID
+kill -9 PID                     # Force kill</code></pre>
+
+        <h2>GVIM - Your Editor</h2>
+        <p>GVIM is the standard editor in most DFT teams. Learn these basics:</p>
+
+<pre><code># Open file
+gvim file.v &                   # Open in GUI
+
+# Essential commands (press Esc first for command mode)
+i           Insert before cursor
+a           Insert after cursor
+o           New line below
+dd          Delete line
+yy          Copy line
+p           Paste below
+u           Undo
+Ctrl+r      Redo
+
+# Search
+/pattern    Search forward
+n           Next match
+N           Previous match
+
+# Replace
+:%s/old/new/g   Replace all in file
+
+# Save & Quit
+:w          Save
+:q          Quit
+:wq         Save and quit
+:q!         Quit without saving
+
+# Navigation
+gg          Go to top
+G           Go to bottom
+:100        Go to line 100</code></pre>
+
+        <h2>Quick Reference Card</h2>
+        <table>
+            <tr><th>Task</th><th>Command</th></tr>
+            <tr><td>Find files</td><td><code>find . -name "*.v"</code></td></tr>
+            <tr><td>Search in files</td><td><code>grep -r "pattern" .</code></td></tr>
+            <tr><td>Count lines</td><td><code>wc -l file</code></td></tr>
+            <tr><td>Compare files</td><td><code>diff file1 file2</code></td></tr>
+            <tr><td>Sort output</td><td><code>sort file</code></td></tr>
+            <tr><td>Unique lines</td><td><code>sort file | uniq</code></td></tr>
+            <tr><td>Disk usage</td><td><code>du -sh *</code></td></tr>
+            <tr><td>Current dir size</td><td><code>du -sh .</code></td></tr>
+        </table>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <p>Master these commands and you'll navigate any DFT project with confidence:</p>
+            <ol>
+                <li><strong>Navigate:</strong> <code>cd</code>, <code>ls -lrt</code>, <code>pwd</code></li>
+                <li><strong>View:</strong> <code>cat</code>, <code>head</code>, <code>tail -f</code>, <code>less</code></li>
+                <li><strong>Search:</strong> <code>grep -r</code>, <code>find</code></li>
+                <li><strong>Edit:</strong> <code>gvim</code> basics</li>
+                <li><strong>Jobs:</strong> <code>ps</code>, <code>kill</code>, <code>nohup</code></li>
+            </ol>
+        </div>
+
+        <div class="nav-buttons">
+            <span class="nav-btn disabled">← Previous</span>
+            <a href="02_Digital_Design_Fundamentals.html" class="nav-btn next">Digital Design Fundamentals</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>DFT Engineering Blog Series | Part 1 of 11</p>
+    </div>
+</body>
+</html>

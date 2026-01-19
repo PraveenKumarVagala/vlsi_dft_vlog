@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practical DFT Flow | DFT Blog</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="index.html">🔧 DFT Blog</a></h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="10_JTAG.html">← Prev</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="article-header">
+            <span class="article-number">Part 11 of 11</span>
+            <h1>Practical DFT Flow</h1>
+            <p class="subtitle">From RTL to test patterns - the complete workflow</p>
+            <p class="author">By <strong>Praveen Kumar Vagala</strong></p>
+            <div class="view-counter">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <span class="view-count">1,356</span> views
+            </div>
+        </div>
+
+        <h2>The Big Picture</h2>
+
+<div class="diagram">┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  RTL ──► Synthesis ──► DFT Insertion ──► ATPG          │
+│                              │              │           │
+│                         Scan Netlist    Patterns        │
+│                              │              │           │
+│                              ▼              ▼           │
+│                        Place & Route    Simulation      │
+│                              │              │           │
+│                              ▼              ▼           │
+│                          Fabrication    Tester         │
+│                              │              │           │
+│                              ▼              ▼           │
+│                           Silicon ──► Manufacturing Test│
+│                                                         │
+└─────────────────────────────────────────────────────────┘</div>
+
+        <h2>Step 1: RTL Design</h2>
+        <p>Write clean, DFT-friendly RTL:</p>
+
+<pre><code>// Good practice: synchronous resets when possible
+always @(posedge clk) begin
+    if (sync_rst)
+        count <= 0;
+    else
+        count <= count + 1;
+end
+
+// Avoid: tri-state buses internally
+// Avoid: combinational loops
+// Avoid: latches (unless intentional)</code></pre>
+
+        <h2>Step 2: Synthesis</h2>
+        <p>Convert RTL to gate-level netlist.</p>
+
+<pre><code># Example Synopsys DC script
+read_verilog design.v
+link
+check_design
+
+# Compile
+compile_ultra
+
+# Write netlist
+write -format ddc -output design.ddc</code></pre>
+
+        <h2>Step 3: DFT Insertion</h2>
+        <p>Add scan chains, BIST, JTAG to the netlist.</p>
+
+        <h3>DFT Compiler Example (Synopsys)</h3>
+<pre><code># Read synthesized design
+read_ddc design.ddc
+
+# Define test clocks
+create_clock -name clk -period 10 [get_ports clk]
+
+# Configure scan
+set_scan_configuration -chain_count 100
+set_scan_configuration -clock_mixing no_mix
+
+# Define test signals
+set_dft_signal -view existing_dft -type ScanClock \
+    -timing [list 45 55] -port clk
+
+set_dft_signal -view existing_dft -type Reset \
+    -active_state 0 -port rst_n
+
+set_dft_signal -view existing_dft -type ScanEnable \
+    -port scan_en -active_state 1
+
+# Preview scan (check before insertion)
+preview_dft
+
+# Insert scan
+insert_dft
+
+# Check for violations
+dft_drc
+
+# Write outputs
+write -format ddc -output design_scan.ddc
+write_test_protocol -output scan.spf -test_mode all
+write_scan_def -output scan.def</code></pre>
+
+        <h3>Key Outputs</h3>
+        <table>
+            <tr><th>File</th><th>Purpose</th></tr>
+            <tr><td><code>design_scan.ddc</code></td><td>Netlist with scan inserted</td></tr>
+            <tr><td><code>scan.spf</code></td><td>Scan protocol for ATPG</td></tr>
+            <tr><td><code>scan.def</code></td><td>Scan chain definitions</td></tr>
+        </table>
+
+        <h2>Step 4: ATPG</h2>
+        <p>Generate test patterns using the scan netlist.</p>
+
+        <h3>TetraMAX Example (Synopsys)</h3>
+<pre><code># 1. Read design
+read_netlist design_scan.v -library lib.db
+run_build_model design
+
+# 2. Read scan protocol
+run_drc scan.spf
+
+# 3. Add faults - Stuck-at
+set_faults -model stuck
+add_faults -all
+
+# 4. Run ATPG
+set_atpg -merge high -verbose
+run_atpg -auto
+
+# 5. Report
+report_faults -summary > coverage_stuck.rpt
+report_faults -class ud -limit 100 > undetected.rpt
+
+# 6. Transition faults
+set_faults -model transition -fault_coverage
+add_faults -all
+run_atpg -auto
+
+report_faults -summary > coverage_trans.rpt
+
+# 7. Write patterns
+write_patterns patterns.stil -format stil -replace
+write_faults faults.gz -compressed -replace</code></pre>
+
+        <h2>Step 5: Verify Patterns</h2>
+        <p>Simulate patterns on gate-level netlist.</p>
+
+<pre><code># Run pattern simulation
+run_simulation -patterns patterns.stil
+
+# Check for mismatches
+report_simulation_failures</code></pre>
+
+        <h2>Reading Coverage Reports</h2>
+
+        <h3>Sample Report</h3>
+<pre><code>========================================
+       FAULT COVERAGE SUMMARY
+========================================
+Test Mode:          Internal_scan
+Fault Model:        Stuck-at
+
+                    #Faults    Coverage
+                   ---------  ---------
+DT (Detected)        985,234     98.52%
+PT (Possibly Det.)     2,156      0.22%
+AU (ATPG Untest.)      8,543      -----
+UD (Undetected)        4,067      0.41%
+TI (Tied)              3,421      -----
+                   ---------
+Total               1,003,421
+
+Fault Coverage:        98.52%
+Test Coverage:         99.37%
+Patterns:              15,234
+CPU Time:              2h 15m
+========================================</code></pre>
+
+        <h3>Key Metrics</h3>
+        <table>
+            <tr><th>Metric</th><th>Target</th><th>Meaning</th></tr>
+            <tr><td>Fault Coverage</td><td>>98%</td><td>Detected / Testable</td></tr>
+            <tr><td>Test Coverage</td><td>>99%</td><td>Including untestable</td></tr>
+            <tr><td>Pattern Count</td><td>Minimize</td><td>Affects test time</td></tr>
+        </table>
+
+        <h2>Debugging Low Coverage</h2>
+
+        <h3>Step 1: Check DRC Violations</h3>
+<pre><code>report_drc > drc.rpt</code></pre>
+
+        <p>Common issues:</p>
+        <ul>
+            <li>Clocks not controllable</li>
+            <li>Resets not controllable</li>
+            <li>FFs not in scan chain</li>
+        </ul>
+
+        <h3>Step 2: Analyze Undetected Faults</h3>
+<pre><code>report_faults -class ud > ud_faults.rpt</code></pre>
+
+        <p>Look for patterns:</p>
+        <ul>
+            <li>All in same module? → Design issue</li>
+            <li>All on same signal type? → Constraint issue</li>
+            <li>Mostly unobservable? → Need test points</li>
+        </ul>
+
+        <h3>Step 3: Fix Issues</h3>
+        <table>
+            <tr><th>Issue</th><th>Fix</th></tr>
+            <tr><td>Gated clock</td><td>Add test mode bypass</td></tr>
+            <tr><td>Deep logic</td><td>Add observation point</td></tr>
+            <tr><td>Tied signals</td><td>Check if real or constraint</td></tr>
+            <tr><td>Async reset</td><td>Add test mode control</td></tr>
+        </table>
+
+        <h2>DFT Checklist</h2>
+        <p>Before signoff:</p>
+
+<pre><code>□ All FFs in scan chains
+□ No DRC violations
+□ Stuck-at coverage > 98%
+□ Transition coverage > 95%
+□ No simulation mismatches
+□ MBIST for all memories
+□ JTAG present and verified
+□ Compression working
+□ At-speed tests included
+□ Pattern count acceptable</code></pre>
+
+        <h2>File Formats</h2>
+        <table>
+            <tr><th>Format</th><th>Purpose</th></tr>
+            <tr><td><strong>.v</strong></td><td>Verilog netlist</td></tr>
+            <tr><td><strong>.ddc</strong></td><td>Synopsys compiled database</td></tr>
+            <tr><td><strong>.spf</strong></td><td>Scan protocol</td></tr>
+            <tr><td><strong>.stil</strong></td><td>IEEE standard pattern format</td></tr>
+            <tr><td><strong>.wgl</strong></td><td>Mentor pattern format</td></tr>
+            <tr><td><strong>.def</strong></td><td>Physical scan chain definition</td></tr>
+        </table>
+
+        <h2>Common Tools by Vendor</h2>
+        <table>
+            <tr><th>Function</th><th>Synopsys</th><th>Cadence</th><th>Mentor/Siemens</th></tr>
+            <tr><td>DFT Insertion</td><td>DFT Compiler</td><td>Modus</td><td>Tessent</td></tr>
+            <tr><td>ATPG</td><td>TetraMAX</td><td>Modus</td><td>Tessent</td></tr>
+            <tr><td>Compression</td><td>DFTMAX</td><td>Modus</td><td>Tessent</td></tr>
+        </table>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <table>
+                <tr><th>Step</th><th>Tool</th><th>Output</th></tr>
+                <tr><td>1. Design</td><td>Any</td><td>RTL (.v)</td></tr>
+                <tr><td>2. Synthesize</td><td>DC</td><td>Netlist (.ddc)</td></tr>
+                <tr><td>3. Insert DFT</td><td>DFT Compiler</td><td>Scan netlist + protocol</td></tr>
+                <tr><td>4. ATPG</td><td>TetraMAX</td><td>Patterns (.stil)</td></tr>
+                <tr><td>5. Verify</td><td>VCS/simulation</td><td>Pass/fail</td></tr>
+                <tr><td>6. Test</td><td>ATE</td><td>Good/bad chips</td></tr>
+            </table>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #1a4a3a, #1e2a4a); border: 2px solid #00ff88; border-radius: 15px; padding: 30px; margin: 40px 0; text-align: center;">
+            <h2 style="color: #00ff88; margin-bottom: 15px;">🎉 Congratulations!</h2>
+            <p style="font-size: 1.2em;">You've completed the DFT Engineering Blog Series!</p>
+            <p>You now have the foundation to start working on DFT projects.</p>
+            <a href="index.html" class="nav-btn" style="margin-top: 20px; display: inline-block;">← Back to All Articles</a>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="10_JTAG.html" class="nav-btn prev">JTAG</a>
+            <a href="index.html" class="nav-btn next">All Articles</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>DFT Engineering Blog Series | Part 11 of 11 | The End</p>
+    </div>
+</body>
+</html>
